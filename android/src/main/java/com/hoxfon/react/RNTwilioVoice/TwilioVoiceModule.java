@@ -2,8 +2,13 @@ package com.hoxfon.react.RNTwilioVoice;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.util.Log;
+import com.facebook.react.ReactApplication;
+import com.facebook.react.ReactInstanceManager;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReadableMap;
@@ -39,8 +44,6 @@ import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_DEVICE_READY;
 public class TwilioVoiceModule extends ReactContextBaseJavaModule implements ActivityEventListener, LifecycleEventListener {
 
     public static String TAG = "RNTwilioVoice";
-
-    // Empty HashMap, contains parameters for the Outbound call
     private HashMap<String, String> twiMLParams = new HashMap<>();
     private String accessToken;
     private CallInvite activeCallInvite;
@@ -50,8 +53,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     private RegistrationListener registrationListener = registrationListener();
     private Call.Listener callListener = callListener();
     private Call activeCall;
-
-    // this variable determines when to create missed calls notifications
     private Boolean callAccepted = false;
     private EventManager eventManager;
 
@@ -217,6 +218,11 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             promise.reject(new JSApplicationIllegalArgumentException("Invalid access token"));
             return;
         }
+        
+        if (fcmToken.equals("")) {
+            promise.reject(new JSApplicationIllegalArgumentException("Invalid FCM token"));
+            return;
+        }
 
         TwilioVoiceModule.this.accessToken = accessToken;
         if (BuildConfig.DEBUG) {
@@ -229,7 +235,9 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     }
 
     @ReactMethod
-    public boolean handleCallInvite(ReadableMap notification) {
+    public void handleCallInvite(ReadableMap notification, Promise promise) {
+
+        final WritableMap result = Arguments.createMap();
 
         Map<String, String> data = new HashMap<>();
         ReadableMapKeySetIterator iterator = notification.keySetIterator();
@@ -260,6 +268,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
             @Override
             public void onCallInvite(final CallInvite callInvite) {
+                result.putString("type", "INVITE");
                 WritableMap params = Arguments.createMap();
                 params.putString("call_sid", callInvite.getCallSid());
                 params.putString("call_from", callInvite.getFrom());
@@ -271,6 +280,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
             @Override
             public void onCancelledCallInvite(@NonNull CancelledCallInvite cancelledCallInvite) {
+                result.putString("type", "CANCELLED");
                 WritableMap params = Arguments.createMap();
                 params.putString("call_sid", cancelledCallInvite.getCallSid());
                 params.putString("call_from", cancelledCallInvite.getFrom());
@@ -281,7 +291,8 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             }
 
         });
-        return valid;
+        result.putBoolean("isValid", valid);
+        promise.resolve(result);
     }
 
 
