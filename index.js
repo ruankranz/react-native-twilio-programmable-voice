@@ -56,8 +56,9 @@ const Twilio = {
             TwilioVoice.initWithAccessTokenUrl(url)
         }
     },
-    handleCallInvite(params = {}) {
-        TwilioVoice.handleCallInvite(params)
+    async handleCallInvite(params = {}) {
+        const result = await TwilioVoice.handleCallInvite(params)
+        return result
     },
     connect(params = {}) {
         TwilioVoice.connect(params)
