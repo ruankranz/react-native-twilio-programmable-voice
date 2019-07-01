@@ -279,7 +279,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             }
 
             @Override
-            public void onCancelledCallInvite(@NonNull CancelledCallInvite cancelledCallInvite) {
+            public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite) {
                 result.putString("type", "CANCELLED");
                 WritableMap params = Arguments.createMap();
                 params.putString("call_sid", cancelledCallInvite.getCallSid());
@@ -296,17 +296,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     }
 
 
-    /*
-     * Register your FCM token with Twilio to receive incoming call invites
-     *
-     * If a valid google-services.json has not been provided or the FirebaseInstanceId has not been
-     * initialized the fcmToken will be null.
-     *
-     * In the case where the FirebaseInstanceId has not yet been initialized the
-     * VoiceFirebaseInstanceIDService.onTokenRefresh should result in a LocalBroadcast to this
-     * activity which will attempt registerForCallInvites again.
-     *
-     */
     private void registerForCallInvites(String fcmToken) {
 
         if (fcmToken != null) {
