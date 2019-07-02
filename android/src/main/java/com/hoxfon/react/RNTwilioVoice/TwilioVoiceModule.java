@@ -218,7 +218,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             promise.reject(new JSApplicationIllegalArgumentException("Invalid access token"));
             return;
         }
-        
+
         if (fcmToken.equals("")) {
             promise.reject(new JSApplicationIllegalArgumentException("Invalid FCM token"));
             return;
@@ -267,26 +267,26 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
         boolean valid = Voice.handleMessage(data, new MessageListener() {
 
             @Override
-            public void onCallInvite(final CallInvite callInvite) {
+            public void onCallInvite(@NonNull final CallInvite callInvite) {
                 result.putString("type", "INVITE");
-                WritableMap params = Arguments.createMap();
-                params.putString("call_sid", callInvite.getCallSid());
-                params.putString("call_from", callInvite.getFrom());
-                params.putString("call_to", callInvite.getTo());
-                params.putString("call_state", "PENDING");
-                eventManager.sendEvent(EVENT_DEVICE_DID_RECEIVE_INCOMING, params);
+                result.putString("call_sid", callInvite.getCallSid());
+                result.putString("call_from", callInvite.getFrom());
+                result.putString("call_to", callInvite.getTo());
+                result.putString("call_state", "PENDING");
                 activeCallInvite = callInvite;
             }
 
             @Override
             public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite) {
-                result.putString("type", "CANCELLED");
-                WritableMap params = Arguments.createMap();
-                params.putString("call_sid", cancelledCallInvite.getCallSid());
-                params.putString("call_from", cancelledCallInvite.getFrom());
-                params.putString("call_to", cancelledCallInvite.getTo());
-                params.putString("call_state", "CANCELLED");
-                eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, params);
+                if (activeCall == null) {
+                    result.putString("type", "CANCELLED");
+                } else {
+                    result.putString("type", "ANSWERED");
+                }
+                result.putString("call_sid", cancelledCallInvite.getCallSid());
+                result.putString("call_from", cancelledCallInvite.getFrom());
+                result.putString("call_to", cancelledCallInvite.getTo());
+                result.putString("call_state", "CANCELLED");
                 activeCallInvite = null;
             }
 
