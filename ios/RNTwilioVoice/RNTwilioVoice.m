@@ -100,7 +100,8 @@
         
         UIDevice* device = [UIDevice currentDevice];
         device.proximityMonitoringEnabled = YES;
-        
+        self.audioDevice = [TVODefaultAudioDevice audioDevice];
+        TwilioVoice.audioDevice = self.audioDevice;
         if (self.call && self.call.state == TVOCallStateConnected) {
             [self.call disconnect];
         } else {
@@ -444,7 +445,8 @@ withCompletionHandler:(void (^)(void))completion {
             }
         }
     };
-    self.audioDevice.block();}
+    self.audioDevice.block();
+}
     
 #pragma mark - CXProviderDelegate
 - (void)providerDidReset:(CXProvider *)provider {
