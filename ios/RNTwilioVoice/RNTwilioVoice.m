@@ -73,6 +73,8 @@
     
     RCT_EXPORT_METHOD(configureCallKit: (NSDictionary *)params) {
         if (self.callKitCallController == nil) {
+            self.audioDevice = [TVODefaultAudioDevice audioDevice];
+            TwilioVoice.audioDevice = self.audioDevice;
             _settings = [[NSMutableDictionary alloc] initWithDictionary:params];
             CXProviderConfiguration *configuration = [[CXProviderConfiguration alloc] initWithLocalizedName:params[@"appName"]];
             configuration.maximumCallGroups = 1;
@@ -445,8 +447,7 @@ withCompletionHandler:(void (^)(void))completion {
             }
         }
     };
-    self.audioDevice.block();
-}
+    self.audioDevice.block();}
     
 #pragma mark - CXProviderDelegate
 - (void)providerDidReset:(CXProvider *)provider {
@@ -476,9 +477,6 @@ withCompletionHandler:(void (^)(void))completion {
 - (void)provider:(CXProvider *)provider performStartCallAction:(CXStartCallAction *)action {
     NSLog(@"provider:performStartCallAction");
     
-    self.audioDevice.enabled = NO;
-    self.audioDevice.block();
-    
     [self.callKitProvider reportOutgoingCallWithUUID:action.callUUID startedConnectingAtDate:[NSDate date]];
     
     __weak typeof(self) weakSelf = self;
@@ -495,14 +493,7 @@ withCompletionHandler:(void (^)(void))completion {
     
 - (void)provider:(CXProvider *)provider performAnswerCallAction:(CXAnswerCallAction *)action {
     NSLog(@"provider:performAnswerCallAction");
-    
-    // RCP: Workaround from https://forums.developer.apple.com/message/169511 suggests configuring audio in the
-    //      completion block of the `reportNewIncomingCallWithUUID:update:completion:` method instead of in
-    //      `provider:performAnswerCallAction:` per the WWDC examples.
-    // [TwilioVoice configureAudioSession];
-    
     NSAssert([self.callInvite.uuid isEqual:action.callUUID], @"We only support one Invite at a time.");
-    
     self.audioDevice.enabled = NO;
     self.audioDevice.block();
     [self performAnswerVoiceCallWithUUID:action.callUUID completion:^(BOOL success) {
@@ -652,4 +643,4 @@ withCompletionHandler:(void (^)(void))completion {
     }
 }
     
-    @end
+@end
