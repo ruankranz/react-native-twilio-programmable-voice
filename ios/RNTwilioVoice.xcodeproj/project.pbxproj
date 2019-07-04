@@ -118,7 +118,6 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				English,
 				en,
 			);
 			mainGroup = 38F71DEC1E9C333E0067E86F;
@@ -255,7 +254,7 @@
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)",
-					"$(SRCROOT)/../../../ios/Pods/TwilioVoice/Build/iOS",
+					"$(SRCROOT)/../../../ios/Pods/TwilioVoice",
 				);
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -269,7 +268,7 @@
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)",
-					"$(SRCROOT)/../../../ios/Pods/TwilioVoice/Build/iOS",
+					"$(SRCROOT)/../../../ios/Pods/TwilioVoice",
 				);
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
