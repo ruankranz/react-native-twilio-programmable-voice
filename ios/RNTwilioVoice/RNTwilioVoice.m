@@ -213,7 +213,12 @@
     NSLog(@"pushRegistry:didUpdatePushCredentials:forType");
     
     if ([type isEqualToString:PKPushTypeVoIP]) {
-        self.deviceTokenString = [credentials.token description];
+        const unsigned *tokenBytes = [credentials.token bytes];
+        self.deviceTokenString = [NSString stringWithFormat:@"<%08x %08x %08x %08x %08x %08x %08x %08x>", 
+                                                        ntohl(tokenBytes[0]), ntohl(tokenBytes[1]), ntohl(tokenBytes[2]),
+                                                        ntohl(tokenBytes[3]), ntohl(tokenBytes[4]), ntohl(tokenBytes[5]),
+                                                        ntohl(tokenBytes[6]), ntohl(tokenBytes[7])];
+    ...
         NSString *accessToken = [self fetchAccessToken];
         
         [TwilioVoice registerWithAccessToken:accessToken
@@ -255,6 +260,38 @@
     
 - (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type {
     NSLog(@"pushRegistry:didReceiveIncomingPushWithPayload:forType:");
+
+    withCompletionHandler:(void (^)(void))completion {
+    if ([payload.dictionaryPayload[@"twi_message_type"] isEqualToString:@"twilio.voice.cancel"]) {
+        CXHandle *callHandle = [[CXHandle alloc] initWithType:CXHandleTypeGeneric value:@"alice"];
+
+        CXCallUpdate *callUpdate = [[CXCallUpdate alloc] init];
+        callUpdate.remoteHandle = callHandle;
+        callUpdate.supportsDTMF = YES;
+        callUpdate.supportsHolding = YES;
+        callUpdate.supportsGrouping = NO;
+        callUpdate.supportsUngrouping = NO;
+        callUpdate.hasVideo = NO;
+
+        NSUUID *uuid = [NSUUID UUID];
+
+        [self.callKitProvider reportNewIncomingCallWithUUID:uuid update:callUpdate completion:^(NSError *error) {
+            ...
+        }];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            CXEndCallAction *endCallAction = [[CXEndCallAction alloc] initWithCallUUID:uuid];
+            CXTransaction *transaction = [[CXTransaction alloc] initWithAction:endCallAction];
+
+            [self.callKitCallController requestTransaction:transaction completion:^(NSError *error) {
+                ...
+            }];
+        });
+
+        return;
+    }
+
+    
     if ([type isEqualToString:PKPushTypeVoIP]) {
         if (![TwilioVoice handleNotification:payload.dictionaryPayload delegate:self]) {
             NSLog(@"This is not a valid Twilio Voice notification.");
