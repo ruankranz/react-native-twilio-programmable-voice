@@ -10,7 +10,7 @@
 @import CallKit;
 @import TwilioVoice;
 
-@interface RNTwilioVoice () <PKPushRegistryDelegate, /*TVONotificationDelegate,*/ TVOCallDelegate, CXProviderDelegate>
+@interface RNTwilioVoice () <PKPushRegistryDelegate, TVONotificationDelegate, TVOCallDelegate, CXProviderDelegate>
     @property (nonatomic, strong) NSString *deviceTokenString;
     
     @property (nonatomic, strong) PKPushRegistry *voipRegistry;
@@ -192,6 +192,7 @@
     }
     
 - (void)initPushRegistry {
+    NSLog(@"initPushRegistry called");
     self.voipRegistry = [[PKPushRegistry alloc] initWithQueue:dispatch_get_main_queue()];
     self.voipRegistry.delegate = self;
     self.voipRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
@@ -258,6 +259,10 @@
     }
 }
     
+/**
+ * This delegate method is available on iOS 11 and above. Call the completion handler once the
+ * notification payload is passed to the `TwilioVoice.handleNotification()` method.
+ */
 - (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type withCompletionHandler:(void (^)(void))completion {
     
 
@@ -304,27 +309,20 @@
 
     
     if ([type isEqualToString:PKPushTypeVoIP]) {
-        if (![TwilioVoice handleNotification:payload.dictionaryPayload delegate:self]) {
+        if (![TwilioVoice handleNotification:payload.dictionaryPayload delegate:self delegateQueue: Nil]) {
             NSLog(@"This is not a valid Twilio Voice notification.");
         }
     }
 }
     
-    /**
-     * This delegate method is available on iOS 11 and above. Call the completion handler once the
-     * notification payload is passed to the `TwilioVoice.handleNotification()` method.
-     */
 - (void)pushRegistry:(PKPushRegistry *)registry
 didReceiveIncomingPushWithPayload:(PKPushPayload *)payload
              forType:(PKPushType)type
 {
     NSLog(@"pushRegistry:didReceiveIncomingPushWithPayload:forType:withCompletionHandler:");
     
-    // Save for later when the notification is properly handled.
-//    self.incomingPushCompletionCallback = completion;
-    
     if ([type isEqualToString:PKPushTypeVoIP]) {
-        if (![TwilioVoice handleNotification:payload.dictionaryPayload delegate:self]) {
+        if (![TwilioVoice handleNotification:payload.dictionaryPayload delegate:self delegateQueue: Nil]) {
             NSLog(@"This is not a valid Twilio Voice notification.");
         }
     }
