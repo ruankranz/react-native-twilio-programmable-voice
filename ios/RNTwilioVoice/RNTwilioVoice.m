@@ -211,14 +211,14 @@
 #pragma mark - PKPushRegistryDelegate
 - (void)pushRegistry:(PKPushRegistry *)registry didUpdatePushCredentials:(PKPushCredentials *)credentials forType:(NSString *)type {
     NSLog(@"pushRegistry:didUpdatePushCredentials:forType");
-    
+
     if ([type isEqualToString:PKPushTypeVoIP]) {
         const unsigned *tokenBytes = [credentials.token bytes];
         self.deviceTokenString = [NSString stringWithFormat:@"<%08x %08x %08x %08x %08x %08x %08x %08x>", 
                                                         ntohl(tokenBytes[0]), ntohl(tokenBytes[1]), ntohl(tokenBytes[2]),
                                                         ntohl(tokenBytes[3]), ntohl(tokenBytes[4]), ntohl(tokenBytes[5]),
                                                         ntohl(tokenBytes[6]), ntohl(tokenBytes[7])];
-    ...
+
         NSString *accessToken = [self fetchAccessToken];
         
         [TwilioVoice registerWithAccessToken:accessToken
@@ -276,7 +276,12 @@
         NSUUID *uuid = [NSUUID UUID];
 
         [self.callKitProvider reportNewIncomingCallWithUUID:uuid update:callUpdate completion:^(NSError *error) {
-            ...
+
+            if (error) {
+              NSLog(@"Failed to report incoming call successfully: %@.", [error localizedDescription]);
+            } else {
+              NSLog(@"Incoming call successfully reported");
+            }
         }];
 
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -284,7 +289,11 @@
             CXTransaction *transaction = [[CXTransaction alloc] initWithAction:endCallAction];
 
             [self.callKitCallController requestTransaction:transaction completion:^(NSError *error) {
-                ...
+                if (error) {
+                  NSLog(@"requestTransaction request failed: %@", [error localizedDescription]);
+                } else {
+                  NSLog(@"requestTransaction transaction request successful");
+                }
             }];
         });
 
