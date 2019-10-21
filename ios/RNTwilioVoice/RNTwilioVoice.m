@@ -260,7 +260,7 @@
     
 - (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type withCompletionHandler:(void (^)(void))completion {
     
-    {
+
     NSLog(@"pushRegistry:didReceiveIncomingPushWithPayload:forType:");
 
     
@@ -317,11 +317,11 @@
 - (void)pushRegistry:(PKPushRegistry *)registry
 didReceiveIncomingPushWithPayload:(PKPushPayload *)payload
              forType:(PKPushType)type
-withCompletionHandler:(void (^)(void))completion {
+{
     NSLog(@"pushRegistry:didReceiveIncomingPushWithPayload:forType:withCompletionHandler:");
     
     // Save for later when the notification is properly handled.
-    self.incomingPushCompletionCallback = completion;
+//    self.incomingPushCompletionCallback = completion;
     
     if ([type isEqualToString:PKPushTypeVoIP]) {
         if (![TwilioVoice handleNotification:payload.dictionaryPayload delegate:self]) {
