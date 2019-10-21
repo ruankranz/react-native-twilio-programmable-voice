@@ -10,7 +10,7 @@
 @import CallKit;
 @import TwilioVoice;
 
-@interface RNTwilioVoice () <PKPushRegistryDelegate, TVONotificationDelegate, TVOCallDelegate, CXProviderDelegate>
+@interface RNTwilioVoice () <PKPushRegistryDelegate, /*TVONotificationDelegate,*/ TVOCallDelegate, CXProviderDelegate>
     @property (nonatomic, strong) NSString *deviceTokenString;
     
     @property (nonatomic, strong) PKPushRegistry *voipRegistry;
@@ -258,10 +258,12 @@
     }
 }
     
-- (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type {
+- (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type withCompletionHandler:(void (^)(void))completion {
+    
+    {
     NSLog(@"pushRegistry:didReceiveIncomingPushWithPayload:forType:");
 
-    withCompletionHandler:(void (^)(void))completion {
+    
     if ([payload.dictionaryPayload[@"twi_message_type"] isEqualToString:@"twilio.voice.cancel"]) {
         CXHandle *callHandle = [[CXHandle alloc] initWithType:CXHandleTypeGeneric value:@"alice"];
 
@@ -356,7 +358,7 @@ withCompletionHandler:(void (^)(void))completion {
 }
     
     
-- (void)cancelledCallInviteReceived:(TVOCancelledCallInvite *)cancelledCallInvite {
+- (void)cancelledCallInviteReceived:(TVOCancelledCallInvite *)cancelledCallInvite error:(nonnull NSError *)error {
     NSLog(@"cancelledCallInviteReceived:");
     
     [self incomingPushHandled];
