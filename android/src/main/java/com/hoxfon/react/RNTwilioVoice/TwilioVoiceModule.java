@@ -40,6 +40,9 @@ import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_DID_D
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_DEVICE_DID_RECEIVE_INCOMING;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_DEVICE_NOT_READY;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_DEVICE_READY;
+import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_DID_RECONNECT;
+import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_IS_RECONNECTING;
+import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_IS_RINGING;
 
 public class TwilioVoiceModule extends ReactContextBaseJavaModule implements ActivityEventListener, LifecycleEventListener {
 
@@ -199,16 +202,46 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "Ringing");
                 }
+
+                WritableMap params = Arguments.createMap();
+                if (call != null) {
+                    params.putString("call_sid", call.getSid());
+                    params.putString("call_state", call.getState().name());
+                    params.putString("call_from", call.getFrom());
+                    params.putString("call_to", call.getTo());
+                    activeCall = call;
+                }
+                eventManager.sendEvent(EVENT_CONNECTION_IS_RINGING, params);
             }
 
             @Override
             public void onReconnecting(@NonNull Call call, @NonNull CallException callException) {
                 Log.d(TAG, "Reconnecting");
+
+                WritableMap params = Arguments.createMap();
+                if (call != null) {
+                    params.putString("call_sid", call.getSid());
+                    params.putString("call_state", call.getState().name());
+                    params.putString("call_from", call.getFrom());
+                    params.putString("call_to", call.getTo());
+                    activeCall = call;
+                }
+                eventManager.sendEvent(EVENT_CONNECTION_IS_RECONNECTING, params);
             }
 
             @Override
             public void onReconnected(@NonNull Call call) {
                 Log.d(TAG, "Reconnected");
+                
+                WritableMap params = Arguments.createMap();
+                if (call != null) {
+                    params.putString("call_sid", call.getSid());
+                    params.putString("call_state", call.getState().name());
+                    params.putString("call_from", call.getFrom());
+                    params.putString("call_to", call.getTo());
+                    activeCall = call;
+                }
+                eventManager.sendEvent(EVENT_CONNECTION_DID_RECONNECT, params);
             }
         };
     }
