@@ -5,8 +5,8 @@ import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
 import android.content.Context;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.util.Log;
 import com.facebook.react.ReactApplication;
 import com.facebook.react.ReactInstanceManager;
@@ -49,13 +49,10 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     private HashMap<String, String> twiMLParams = new HashMap<>();
     private String accessToken;
     private CallInvite activeCallInvite;
-    private String toNumber = "";
-    private String toName = "";
     static Map<String, Integer> callNotificationMap;
     private RegistrationListener registrationListener = registrationListener();
     private Call.Listener callListener = callListener();
     private Call activeCall;
-    private Boolean callAccepted = false;
     private EventManager eventManager;
 
     public TwilioVoiceModule(ReactApplicationContext reactContext) {
@@ -140,7 +137,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
             @Override
             public void onDisconnected(Call call, CallException error) {
-                callAccepted = false;
 
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "call disconnected");
@@ -164,13 +160,10 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                     activeCall = null;
                 }
                 eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, params);
-                toNumber = "";
-                toName = "";
             }
 
             @Override
             public void onConnectFailure(Call call, CallException error) {
-                callAccepted = false;
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "connect failure");
                 }
@@ -192,8 +185,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                     activeCall = null;
                 }
                 eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, params);
-                toNumber = "";
-                toName = "";
             }
 
             @Override
@@ -247,9 +238,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     }
 
     @ReactMethod
-    public void handleCallInvite(ReadableMap notification, Promise promise) {
-
-        final WritableMap result = Arguments.createMap();
+    public void handleCallInvite(ReadableMap notification, final Promise promise) {
 
         Map<String, String> data = new HashMap<>();
         ReadableMapKeySetIterator iterator = notification.keySetIterator();
@@ -276,20 +265,23 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             }
         }
 
-        boolean valid = Voice.handleMessage(getApplicationContext(), data, new MessageListener() {
+        boolean valid = Voice.handleMessage(getReactApplicationContext(), data, new MessageListener() {
 
             @Override
             public void onCallInvite(@NonNull final CallInvite callInvite) {
+                final WritableMap result = Arguments.createMap();
                 result.putString("type", "INVITE");
                 result.putString("call_sid", callInvite.getCallSid());
                 result.putString("call_from", callInvite.getFrom());
                 result.putString("call_to", callInvite.getTo());
                 result.putString("call_state", "PENDING");
                 activeCallInvite = callInvite;
+                promise.resolve(result);
             }
 
             @Override
             public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite, @Nullable CallException callException) {
+                final WritableMap result = Arguments.createMap();
                 if (activeCall == null) {
                     result.putString("type", "CANCELLED");
                 } else {
@@ -300,11 +292,10 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 result.putString("call_to", cancelledCallInvite.getTo());
                 result.putString("call_state", "CANCELLED");
                 activeCallInvite = null;
+                promise.resolve(result);
             }
 
         });
-        result.putBoolean("isValid", valid);
-        promise.resolve(result);
     }
 
 
@@ -320,7 +311,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void accept() {
-        callAccepted = true;
         if (activeCallInvite != null) {
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "accept() activeCallInvite.getState() PENDING");
@@ -333,7 +323,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void reject() {
-        callAccepted = false;
         WritableMap params = Arguments.createMap();
         if (activeCallInvite != null) {
             params.putString("call_sid", activeCallInvite.getCallSid());
@@ -347,7 +336,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void ignore() {
-        callAccepted = false;
         WritableMap params = Arguments.createMap();
         if (activeCallInvite != null) {
             params.putString("call_sid", activeCallInvite.getCallSid());
@@ -377,10 +365,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             errParams.putString("err", "Invalid To parameter");
             eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, errParams);
             return;
-        }
-        toNumber = params.getString("To");
-        if (params.hasKey("ToName")) {
-            toName = params.getString("ToName");
         }
 
         twiMLParams.clear();
@@ -466,3 +450,4 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
         promise.resolve(null);
     }
 }
+
