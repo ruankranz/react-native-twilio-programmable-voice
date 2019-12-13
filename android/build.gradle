@@ -54,7 +54,7 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation 'com.facebook.react:react-native:+'
-    implementation 'com.twilio:voice-android:3.1.1'
+    implementation 'com.twilio:voice-android:4.5.0'
     implementation 'com.squareup.retrofit:retrofit:1.9.0'
     implementation 'com.koushikdutta.ion:ion:2.1.8'
 }
