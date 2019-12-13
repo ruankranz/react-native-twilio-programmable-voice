@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
+import android.content.Context;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -275,7 +276,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             }
         }
 
-        boolean valid = Voice.handleMessage(getReactApplicationContext(), data, new MessageListener() {
+        boolean valid = Voice.handleMessage(getApplicationContext(), data, new MessageListener() {
 
             @Override
             public void onCallInvite(@NonNull final CallInvite callInvite) {
