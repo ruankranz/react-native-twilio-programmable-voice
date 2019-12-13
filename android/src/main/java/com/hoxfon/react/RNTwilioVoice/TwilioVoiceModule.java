@@ -274,7 +274,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             }
         }
 
-        boolean valid = Voice.handleMessage(data, new MessageListener() {
+        boolean valid = Voice.handleMessage(getReactApplicationContext(), data, new MessageListener() {
 
             @Override
             public void onCallInvite(@NonNull final CallInvite callInvite) {
@@ -287,7 +287,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             }
 
             @Override
-            public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite) {
+            public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite, @Nullable CallException callException) {
                 if (activeCall == null) {
                     result.putString("type", "CANCELLED");
                 } else {
