@@ -34,6 +34,8 @@
     NSString * const StatePending = @"PENDING";
     NSString * const StateConnecting = @"CONNECTING";
     NSString * const StateConnected = @"CONNECTED";
+    NSString * const StateReconnecting = @"RECONNECTING"
+    NSString * const StateReconnected = @"RECONNECTED"
     NSString * const StateDisconnected = @"DISCONNECTED";
     NSString * const StateRejected = @"REJECTED";
     
@@ -46,7 +48,7 @@
     
 - (NSArray<NSString *> *)supportedEvents
     {
-        return @[@"connectionDidConnect", @"connectionDidDisconnect", @"callRejected", @"deviceReady", @"deviceNotReady"];
+      return @[@"connectionDidConnect", @"connectionDidDisconnect", @"callRejected", @"deviceReady", @"deviceNotReady", @"connectionIsReconnecting", @"connectionDidReconnect"];
     }
     
     @synthesize bridge = _bridge;
@@ -421,13 +423,42 @@ didReceiveIncomingPushWithPayload:(PKPushPayload *)payload
 }
     
 - (void)call:(TVOCall *)call isReconnectingWithError:(NSError *)error {
-    NSLog(@"Call is reconnecting");
+    NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
+    if (error) {
+        NSString* errMsg = [error localizedDescription];
+        if (error.localizedFailureReason) {
+            errMsg = [error localizedFailureReason];
+        }
+        [params setObject:errMsg forKey:@"error"];
+    }
+    [params setObject:call.sid forKey:@"call_sid"];
+    [params setObject:StateReconnecting forKey:@"call_state"];
     
+    if (call.from){
+        [params setObject:call.from forKey:@"from"];
+    }
+    if (call.to){
+        [params setObject:call.to forKey:@"to"];
+    }
+    [self sendEventWithName:@"connectionIsReconnecting" body:params];
 }
     
 - (void)callDidReconnect:(TVOCall *)call {
     NSLog(@"Call reconnected");
+    self.call = call;
+    self.callKitCompletionCallback(YES);
+    self.callKitCompletionCallback = nil;
+    NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
+    [params setObject:call.sid forKey:@"call_sid"];
+    [params setObject:StateReconnected forKey:@"call_state"];
     
+    if (call.from){
+        [params setObject:call.from forKey:@"from"];
+    }
+    if (call.to){
+        [params setObject:call.to forKey:@"to"];
+    }
+    [self sendEventWithName:@"connectionDidReconnect" body:params];
 }
     
 - (void)call:(TVOCall *)call didFailToConnectWithError:(NSError *)error {
