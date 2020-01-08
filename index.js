@@ -19,7 +19,7 @@ const _eventHandlers = {
     connectionDidDisconnect: new Map(),
     connectionIsRinging: new Map(),
     connectionIsReconnecting: new Map(),
-    connectionDidReconnect: new Map();
+    connectionDidReconnect: new Map(),
     //iOS specific
     callRejected: new Map(),
 }
