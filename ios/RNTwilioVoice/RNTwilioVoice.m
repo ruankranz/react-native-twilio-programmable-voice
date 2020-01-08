@@ -32,6 +32,7 @@
 }
     
     NSString * const StatePending = @"PENDING";
+    NSString * const StateRinging = @"RINGING";
     NSString * const StateConnecting = @"CONNECTING";
     NSString * const StateConnected = @"CONNECTED";
     NSString * const StateReconnecting = @"RECONNECTING"
@@ -48,7 +49,7 @@
     
 - (NSArray<NSString *> *)supportedEvents
     {
-      return @[@"connectionDidConnect", @"connectionDidDisconnect", @"callRejected", @"deviceReady", @"deviceNotReady", @"connectionIsReconnecting", @"connectionDidReconnect"];
+      return @[@"connectionDidConnect", @"connectionDidDisconnect", @"callRejected", @"deviceReady", @"deviceNotReady", @"connectionIsReconnecting", @"connectionDidReconnect", @"connectionIsRinging"];
     }
     
     @synthesize bridge = _bridge;
@@ -397,6 +398,18 @@ didReceiveIncomingPushWithPayload:(PKPushPayload *)payload
 #pragma mark - TVOCallDelegate
 - (void)callDidStartRinging:(TVOCall *)call {
     NSLog(@"callDidStartRinging:");
+    
+    NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
+    [params setObject:call.sid forKey:@"call_sid"];
+    [params setObject:StateRinging forKey:@"call_state"];
+    
+    if (call.from){
+        [params setObject:call.from forKey:@"from"];
+    }
+    if (call.to){
+        [params setObject:call.to forKey:@"to"];
+    }
+    [self sendEventWithName:@"connectionIsRinging" body:params];
     
 }
     
