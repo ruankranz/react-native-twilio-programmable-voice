@@ -2,7 +2,7 @@ module.exports = {
     project: {
         ios: {},
         android: {
-            sourceDir: "new TwilioVoicePackage()"
+            packageInstance: "new TwilioVoicePackage()"
         }
     },
 };
