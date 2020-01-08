@@ -2,15 +2,9 @@ package com.hoxfon.react.RNTwilioVoice;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.os.Handler;
-import android.os.Looper;
-import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import android.util.Log;
-import com.facebook.react.ReactApplication;
-import com.facebook.react.ReactInstanceManager;
-import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReadableMap;
@@ -282,17 +276,18 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             @Override
             public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite, @Nullable CallException callException) {
                 final WritableMap result = Arguments.createMap();
-                if (activeCall == null) {
-                    result.putString("type", "CANCELLED");
-                } else {
-                    result.putString("type", "ANSWERED");
-                }
+                Log.d(TAG, "Received cancelled");
+                result.putString("type", "CANCELLED");
                 result.putString("call_sid", cancelledCallInvite.getCallSid());
                 result.putString("call_from", cancelledCallInvite.getFrom());
                 result.putString("call_to", cancelledCallInvite.getTo());
                 result.putString("call_state", "CANCELLED");
-                activeCallInvite = null;
-                promise.resolve(result);
+                if (callException != null) {
+                    result.putString("error", callException.getMessage());
+                    result.putString("error_explanation", callException.getExplanation());
+                    result.putString("error_code", String.valueOf(callException.getErrorCode()));
+                }
+                eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, result);
             }
 
         });
@@ -450,4 +445,3 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
         promise.resolve(null);
     }
 }
-
