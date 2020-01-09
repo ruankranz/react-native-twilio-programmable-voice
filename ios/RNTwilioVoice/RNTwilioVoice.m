@@ -35,8 +35,8 @@
     NSString * const StateRinging = @"RINGING";
     NSString * const StateConnecting = @"CONNECTING";
     NSString * const StateConnected = @"CONNECTED";
-    NSString * const StateReconnecting = @"RECONNECTING"
-    NSString * const StateReconnected = @"RECONNECTED"
+    NSString * const StateReconnecting = @"RECONNECTING";
+    NSString * const StateReconnected = @"RECONNECTED";
     NSString * const StateDisconnected = @"DISCONNECTED";
     NSString * const StateRejected = @"REJECTED";
     
