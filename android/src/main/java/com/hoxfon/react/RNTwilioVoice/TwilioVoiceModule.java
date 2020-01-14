@@ -1,4 +1,4 @@
-package com.hoxfon.react.RNTwilioVoice;
+ackage com.hoxfon.react.RNTwilioVoice;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -321,8 +321,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             if (!valid) {
                 Log.e(TAG, "The message was not a valid Twilio Voice SDK payload: " + notification.toString());
             }
-
-            promise.resolve(null);
 
         } catch (Exception e) {
             Log.e(TAG, "Exception while processing Twilio message: " + notification.toString());
