@@ -2,13 +2,9 @@ package com.hoxfon.react.RNTwilioVoice;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.os.Handler;
-import android.os.Looper;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.util.Log;
-import com.facebook.react.ReactApplication;
-import com.facebook.react.ReactInstanceManager;
-import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReadableMap;
@@ -38,8 +34,12 @@ import java.util.Map;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_DID_CONNECT;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_DID_DISCONNECT;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_DEVICE_DID_RECEIVE_INCOMING;
+import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_INCOMING_CALL_CANCELLED;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_DEVICE_NOT_READY;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_DEVICE_READY;
+import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_DID_RECONNECT;
+import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_IS_RECONNECTING;
+import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_IS_RINGING;
 
 public class TwilioVoiceModule extends ReactContextBaseJavaModule implements ActivityEventListener, LifecycleEventListener {
 
@@ -47,13 +47,10 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     private HashMap<String, String> twiMLParams = new HashMap<>();
     private String accessToken;
     private CallInvite activeCallInvite;
-    private String toNumber = "";
-    private String toName = "";
     static Map<String, Integer> callNotificationMap;
     private RegistrationListener registrationListener = registrationListener();
     private Call.Listener callListener = callListener();
     private Call activeCall;
-    private Boolean callAccepted = false;
     private EventManager eventManager;
 
     public TwilioVoiceModule(ReactApplicationContext reactContext) {
@@ -138,7 +135,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
             @Override
             public void onDisconnected(Call call, CallException error) {
-                callAccepted = false;
 
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "call disconnected");
@@ -162,13 +158,10 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                     activeCall = null;
                 }
                 eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, params);
-                toNumber = "";
-                toName = "";
             }
 
             @Override
-            public void onConnectFailure(Call call, CallException error) {
-                callAccepted = false;
+            public void onConnectFailure(@NonNull Call call, CallException error) {
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "connect failure");
                 }
@@ -179,19 +172,15 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 WritableMap params = Arguments.createMap();
                 params.putString("err", error.getMessage());
                 String callSid = "";
-                if (call != null) {
-                    callSid = call.getSid();
-                    params.putString("call_sid", callSid);
-                    params.putString("call_state", call.getState().name());
-                    params.putString("call_from", call.getFrom());
-                    params.putString("call_to", call.getTo());
-                }
+                callSid = call.getSid();
+                params.putString("call_sid", callSid);
+                params.putString("call_state", call.getState().name());
+                params.putString("call_from", call.getFrom());
+                params.putString("call_to", call.getTo());
                 if (callSid != null && activeCall != null && activeCall.getSid() != null && activeCall.getSid().equals(callSid)) {
                     activeCall = null;
                 }
                 eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, params);
-                toNumber = "";
-                toName = "";
             }
 
             @Override
@@ -199,6 +188,38 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "Ringing");
                 }
+
+                WritableMap params = Arguments.createMap();
+                params.putString("call_sid", call.getSid());
+                params.putString("call_state", call.getState().name());
+                params.putString("call_from", call.getFrom());
+                params.putString("call_to", call.getTo());
+                eventManager.sendEvent(EVENT_CONNECTION_IS_RINGING, params);
+            }
+
+            @Override
+            public void onReconnecting(@NonNull Call call, @NonNull CallException callException) {
+                Log.d(TAG, "Reconnecting");
+
+                WritableMap params = Arguments.createMap();
+                params.putString("call_sid", call.getSid());
+                params.putString("call_state", call.getState().name());
+                params.putString("call_from", call.getFrom());
+                params.putString("call_to", call.getTo());
+                eventManager.sendEvent(EVENT_CONNECTION_IS_RECONNECTING, params);
+            }
+
+            @Override
+            public void onReconnected(@NonNull Call call) {
+                Log.d(TAG, "Reconnected");
+                
+                WritableMap params = Arguments.createMap();
+                params.putString("call_sid", call.getSid());
+                params.putString("call_state", call.getState().name());
+                params.putString("call_from", call.getFrom());
+                params.putString("call_to", call.getTo());
+                activeCall = call;
+                eventManager.sendEvent(EVENT_CONNECTION_DID_RECONNECT, params);
             }
         };
     }
@@ -235,64 +256,76 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     }
 
     @ReactMethod
-    public void handleCallInvite(ReadableMap notification, Promise promise) {
+    public void handleTwilioMessage(ReadableMap notification, final Promise promise) {
 
-        final WritableMap result = Arguments.createMap();
+        try {
 
-        Map<String, String> data = new HashMap<>();
-        ReadableMapKeySetIterator iterator = notification.keySetIterator();
-        while (iterator.hasNextKey()) {
-            String key = iterator.nextKey();
-            ReadableType readableType = notification.getType(key);
-            switch (readableType) {
-                case Null:
-                    data.put(key, "");
-                    break;
-                case Boolean:
-                    data.put(key, String.valueOf(notification.getBoolean(key)));
-                    break;
-                case Number:
-                    // Can be int or double.
-                    data.put(key, String.valueOf(notification.getDouble(key)));
-                    break;
-                case String:
-                    data.put(key, notification.getString(key));
-                    break;
-                default:
-                    Log.d(TAG, "Could not convert with key: " + key + ".");
-                    break;
-            }
-        }
-
-        boolean valid = Voice.handleMessage(data, new MessageListener() {
-
-            @Override
-            public void onCallInvite(@NonNull final CallInvite callInvite) {
-                result.putString("type", "INVITE");
-                result.putString("call_sid", callInvite.getCallSid());
-                result.putString("call_from", callInvite.getFrom());
-                result.putString("call_to", callInvite.getTo());
-                result.putString("call_state", "PENDING");
-                activeCallInvite = callInvite;
-            }
-
-            @Override
-            public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite) {
-                if (activeCall == null) {
-                    result.putString("type", "CANCELLED");
-                } else {
-                    result.putString("type", "ANSWERED");
+            Map<String, String> data = new HashMap<>();
+            ReadableMapKeySetIterator iterator = notification.keySetIterator();
+            while (iterator.hasNextKey()) {
+                String key = iterator.nextKey();
+                ReadableType readableType = notification.getType(key);
+                switch (readableType) {
+                    case Null:
+                        data.put(key, "");
+                        break;
+                    case Boolean:
+                        data.put(key, String.valueOf(notification.getBoolean(key)));
+                        break;
+                    case Number:
+                        // Can be int or double.
+                        data.put(key, String.valueOf(notification.getDouble(key)));
+                        break;
+                    case String:
+                        data.put(key, notification.getString(key));
+                        break;
+                    default:
+                        Log.d(TAG, "Could not convert with key: " + key + ".");
+                        break;
                 }
-                result.putString("call_sid", cancelledCallInvite.getCallSid());
-                result.putString("call_from", cancelledCallInvite.getFrom());
-                result.putString("call_to", cancelledCallInvite.getTo());
-                result.putString("call_state", "CANCELLED");
-                activeCallInvite = null;
             }
 
-        });
-        result.putBoolean("isValid", valid);
-        promise.resolve(result);
+            boolean valid = Voice.handleMessage(getReactApplicationContext(), data, new MessageListener() {
+
+                @Override
+                public void onCallInvite(@NonNull final CallInvite callInvite) {
+                    final WritableMap result = Arguments.createMap();
+                    result.putString("type", "INVITE");
+                    result.putString("call_sid", callInvite.getCallSid());
+                    result.putString("call_from", callInvite.getFrom());
+                    result.putString("call_to", callInvite.getTo());
+                    result.putString("call_state", "PENDING");
+                    activeCallInvite = callInvite;
+                    promise.resolve(result);
+                }
+
+                @Override
+                public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite, @Nullable CallException callException) {
+                    final WritableMap result = Arguments.createMap();
+                    Log.d(TAG, "Received cancelled");
+                    result.putString("type", "CANCELLED");
+                    result.putString("call_sid", cancelledCallInvite.getCallSid());
+                    result.putString("call_from", cancelledCallInvite.getFrom());
+                    result.putString("call_to", cancelledCallInvite.getTo());
+                    result.putString("call_state", "CANCELLED");
+                    if (callException != null) {
+                        result.putString("error", callException.getMessage());
+                        result.putString("error_explanation", callException.getExplanation());
+                        result.putString("error_code", String.valueOf(callException.getErrorCode()));
+                    }
+                    eventManager.sendEvent(EVENT_INCOMING_CALL_CANCELLED, result);
+                }
+
+            });
+
+            if (!valid) {
+                Log.e(TAG, "The message was not a valid Twilio Voice SDK payload: " + notification.toString());
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Exception while processing Twilio message: " + notification.toString());
+            promise.reject("Exception while processing Twilio message", notification.toString());
+        }
     }
 
 
@@ -308,7 +341,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void accept() {
-        callAccepted = true;
         if (activeCallInvite != null) {
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "accept() activeCallInvite.getState() PENDING");
@@ -321,7 +353,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void reject() {
-        callAccepted = false;
         WritableMap params = Arguments.createMap();
         if (activeCallInvite != null) {
             params.putString("call_sid", activeCallInvite.getCallSid());
@@ -335,7 +366,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void ignore() {
-        callAccepted = false;
         WritableMap params = Arguments.createMap();
         if (activeCallInvite != null) {
             params.putString("call_sid", activeCallInvite.getCallSid());
@@ -365,10 +395,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             errParams.putString("err", "Invalid To parameter");
             eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, errParams);
             return;
-        }
-        toNumber = params.getString("To");
-        if (params.hasKey("ToName")) {
-            toName = params.getString("ToName");
         }
 
         twiMLParams.clear();

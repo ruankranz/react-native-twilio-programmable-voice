@@ -17,8 +17,13 @@ const _eventHandlers = {
     deviceDidReceiveIncoming: new Map(),
     connectionDidConnect: new Map(),
     connectionDidDisconnect: new Map(),
-    //iOS specific
+    connectionIsRinging: new Map(),
+    connectionIsReconnecting: new Map(),
+    connectionDidReconnect: new Map(),
+    // iOS specific
     callRejected: new Map(),
+    // Android specific
+    incomingCallCancelled: new Map(),
 }
 
 const Twilio = {
@@ -59,8 +64,8 @@ const Twilio = {
             TwilioVoice.initWithAccessTokenUrl(url)
         }
     },
-    async handleCallInvite(params = {}) {
-        const result = await TwilioVoice.handleCallInvite(params)
+    async handleTwilioMessage(params = {}) {
+        const result = await TwilioVoice.handleTwilioMessage(params)
         return result
     },
     connect(params = {}) {

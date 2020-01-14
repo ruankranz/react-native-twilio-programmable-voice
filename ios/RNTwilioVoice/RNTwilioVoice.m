@@ -32,8 +32,11 @@
 }
     
     NSString * const StatePending = @"PENDING";
+    NSString * const StateRinging = @"RINGING";
     NSString * const StateConnecting = @"CONNECTING";
     NSString * const StateConnected = @"CONNECTED";
+    NSString * const StateReconnecting = @"RECONNECTING";
+    NSString * const StateReconnected = @"RECONNECTED";
     NSString * const StateDisconnected = @"DISCONNECTED";
     NSString * const StateRejected = @"REJECTED";
     
@@ -46,7 +49,7 @@
     
 - (NSArray<NSString *> *)supportedEvents
     {
-        return @[@"connectionDidConnect", @"connectionDidDisconnect", @"callRejected", @"deviceReady", @"deviceNotReady"];
+      return @[@"connectionDidConnect", @"connectionDidDisconnect", @"callRejected", @"deviceReady", @"deviceNotReady", @"connectionIsReconnecting", @"connectionDidReconnect", @"connectionIsRinging"];
     }
     
     @synthesize bridge = _bridge;
@@ -192,6 +195,7 @@
     }
     
 - (void)initPushRegistry {
+    NSLog(@"initPushRegistry called");
     self.voipRegistry = [[PKPushRegistry alloc] initWithQueue:dispatch_get_main_queue()];
     self.voipRegistry.delegate = self;
     self.voipRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
@@ -211,9 +215,14 @@
 #pragma mark - PKPushRegistryDelegate
 - (void)pushRegistry:(PKPushRegistry *)registry didUpdatePushCredentials:(PKPushCredentials *)credentials forType:(NSString *)type {
     NSLog(@"pushRegistry:didUpdatePushCredentials:forType");
-    
+
     if ([type isEqualToString:PKPushTypeVoIP]) {
-        self.deviceTokenString = [credentials.token description];
+        const unsigned *tokenBytes = [credentials.token bytes];
+        self.deviceTokenString = [NSString stringWithFormat:@"<%08x %08x %08x %08x %08x %08x %08x %08x>", 
+                                                        ntohl(tokenBytes[0]), ntohl(tokenBytes[1]), ntohl(tokenBytes[2]),
+                                                        ntohl(tokenBytes[3]), ntohl(tokenBytes[4]), ntohl(tokenBytes[5]),
+                                                        ntohl(tokenBytes[6]), ntohl(tokenBytes[7])];
+
         NSString *accessToken = [self fetchAccessToken];
         
         [TwilioVoice registerWithAccessToken:accessToken
@@ -253,30 +262,70 @@
     }
 }
     
-- (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type {
+/**
+ * This delegate method is available on iOS 11 and above. Call the completion handler once the
+ * notification payload is passed to the `TwilioVoice.handleNotification()` method.
+ */
+- (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type withCompletionHandler:(void (^)(void))completion {
+    
+
     NSLog(@"pushRegistry:didReceiveIncomingPushWithPayload:forType:");
+
+    
+    if ([payload.dictionaryPayload[@"twi_message_type"] isEqualToString:@"twilio.voice.cancel"]) {
+        CXHandle *callHandle = [[CXHandle alloc] initWithType:CXHandleTypeGeneric value:@"alice"];
+
+        CXCallUpdate *callUpdate = [[CXCallUpdate alloc] init];
+        callUpdate.remoteHandle = callHandle;
+        callUpdate.supportsDTMF = YES;
+        callUpdate.supportsHolding = YES;
+        callUpdate.supportsGrouping = NO;
+        callUpdate.supportsUngrouping = NO;
+        callUpdate.hasVideo = NO;
+
+        NSUUID *uuid = [NSUUID UUID];
+
+        [self.callKitProvider reportNewIncomingCallWithUUID:uuid update:callUpdate completion:^(NSError *error) {
+
+            if (error) {
+              NSLog(@"Failed to report incoming call successfully: %@.", [error localizedDescription]);
+            } else {
+              NSLog(@"Incoming call successfully reported");
+            }
+        }];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            CXEndCallAction *endCallAction = [[CXEndCallAction alloc] initWithCallUUID:uuid];
+            CXTransaction *transaction = [[CXTransaction alloc] initWithAction:endCallAction];
+
+            [self.callKitCallController requestTransaction:transaction completion:^(NSError *error) {
+                if (error) {
+                  NSLog(@"requestTransaction request failed: %@", [error localizedDescription]);
+                } else {
+                  NSLog(@"requestTransaction transaction request successful");
+                }
+            }];
+        });
+
+        return;
+    }
+
+    
     if ([type isEqualToString:PKPushTypeVoIP]) {
-        if (![TwilioVoice handleNotification:payload.dictionaryPayload delegate:self]) {
+        if (![TwilioVoice handleNotification:payload.dictionaryPayload delegate:self delegateQueue: Nil]) {
             NSLog(@"This is not a valid Twilio Voice notification.");
         }
     }
 }
     
-    /**
-     * This delegate method is available on iOS 11 and above. Call the completion handler once the
-     * notification payload is passed to the `TwilioVoice.handleNotification()` method.
-     */
 - (void)pushRegistry:(PKPushRegistry *)registry
 didReceiveIncomingPushWithPayload:(PKPushPayload *)payload
              forType:(PKPushType)type
-withCompletionHandler:(void (^)(void))completion {
+{
     NSLog(@"pushRegistry:didReceiveIncomingPushWithPayload:forType:withCompletionHandler:");
     
-    // Save for later when the notification is properly handled.
-    self.incomingPushCompletionCallback = completion;
-    
     if ([type isEqualToString:PKPushTypeVoIP]) {
-        if (![TwilioVoice handleNotification:payload.dictionaryPayload delegate:self]) {
+        if (![TwilioVoice handleNotification:payload.dictionaryPayload delegate:self delegateQueue: Nil]) {
             NSLog(@"This is not a valid Twilio Voice notification.");
         }
     }
@@ -310,7 +359,7 @@ withCompletionHandler:(void (^)(void))completion {
 }
     
     
-- (void)cancelledCallInviteReceived:(TVOCancelledCallInvite *)cancelledCallInvite {
+- (void)cancelledCallInviteReceived:(TVOCancelledCallInvite *)cancelledCallInvite error:(nonnull NSError *)error {
     NSLog(@"cancelledCallInviteReceived:");
     
     [self incomingPushHandled];
@@ -350,6 +399,18 @@ withCompletionHandler:(void (^)(void))completion {
 - (void)callDidStartRinging:(TVOCall *)call {
     NSLog(@"callDidStartRinging:");
     
+    NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
+    [params setObject:call.sid forKey:@"call_sid"];
+    [params setObject:StateRinging forKey:@"call_state"];
+    
+    if (call.from){
+        [params setObject:call.from forKey:@"from"];
+    }
+    if (call.to){
+        [params setObject:call.to forKey:@"to"];
+    }
+    [self sendEventWithName:@"connectionIsRinging" body:params];
+    
 }
     
 - (void)callDidConnect:(TVOCall *)call {
@@ -375,13 +436,42 @@ withCompletionHandler:(void (^)(void))completion {
 }
     
 - (void)call:(TVOCall *)call isReconnectingWithError:(NSError *)error {
-    NSLog(@"Call is reconnecting");
+    NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
+    if (error) {
+        NSString* errMsg = [error localizedDescription];
+        if (error.localizedFailureReason) {
+            errMsg = [error localizedFailureReason];
+        }
+        [params setObject:errMsg forKey:@"error"];
+    }
+    [params setObject:call.sid forKey:@"call_sid"];
+    [params setObject:StateReconnecting forKey:@"call_state"];
     
+    if (call.from){
+        [params setObject:call.from forKey:@"from"];
+    }
+    if (call.to){
+        [params setObject:call.to forKey:@"to"];
+    }
+    [self sendEventWithName:@"connectionIsReconnecting" body:params];
 }
     
 - (void)callDidReconnect:(TVOCall *)call {
     NSLog(@"Call reconnected");
+    self.call = call;
+    self.callKitCompletionCallback(YES);
+    self.callKitCompletionCallback = nil;
+    NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
+    [params setObject:call.sid forKey:@"call_sid"];
+    [params setObject:StateReconnected forKey:@"call_state"];
     
+    if (call.from){
+        [params setObject:call.from forKey:@"from"];
+    }
+    if (call.to){
+        [params setObject:call.to forKey:@"to"];
+    }
+    [self sendEventWithName:@"connectionDidReconnect" body:params];
 }
     
 - (void)call:(TVOCall *)call didFailToConnectWithError:(NSError *)error {
