@@ -1,4 +1,4 @@
-ackage com.hoxfon.react.RNTwilioVoice;
+package com.hoxfon.react.RNTwilioVoice;
 
 import android.app.Activity;
 import android.content.Intent;
