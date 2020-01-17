@@ -180,7 +180,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                             error.getErrorCode(), error.getMessage()));
                     params.putString("error", error.getMessage());
                     params.putString("error_explanation", error.getExplanation());
-                    params.putString("error_code", String.valueOf(error.getErrorCode()));
+                    params.putInt("error_code", error.getErrorCode());
                 }
                 if (callSid != null && activeCall != null && activeCall.getSid() != null && activeCall.getSid().equals(callSid)) {
                     activeCall = null;
@@ -206,7 +206,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 params.putString("call_to", call.getTo());
                 params.putString("error", error.getMessage());
                 params.putString("error_explanation", error.getExplanation());
-                params.putString("error_code", String.valueOf(error.getErrorCode()));
+                params.putInt("error_code", error.getErrorCode());
                 if (callSid != null && activeCall != null && activeCall.getSid() != null && activeCall.getSid().equals(callSid)) {
                     activeCall = null;
                 }
@@ -214,19 +214,22 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             }
 
             @Override
-            public void onReconnecting(@NonNull Call call, @NonNull CallException callException) {
+            public void onReconnecting(@NonNull Call call, @NonNull CallException error) {
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "Reconnecting");
                 }
+
+                Log.e(TAG, String.format("CallListener onReconnecting error: %d, %s",
+                        error.getErrorCode(), error.getMessage()));
 
                 WritableMap params = Arguments.createMap();
                 params.putString("call_sid", call.getSid());
                 params.putString("call_state", call.getState().name());
                 params.putString("call_from", call.getFrom());
                 params.putString("call_to", call.getTo());
-                params.putString("error", callException.getMessage());
-                params.putString("error_explanation", callException.getExplanation());
-                params.putString("error_code", String.valueOf(callException.getErrorCode()));
+                params.putString("error", error.getMessage());
+                params.putString("error_explanation", error.getExplanation());
+                params.putInt("error_code", error.getErrorCode());
 
                 eventManager.sendEvent(EVENT_CONNECTION_IS_RECONNECTING, params);
             }
@@ -323,7 +326,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 }
 
                 @Override
-                public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite, @Nullable CallException callException) {
+                public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite, @Nullable CallException error) {
                     final WritableMap result = Arguments.createMap();
                     Log.d(TAG, "Received cancelled");
                     result.putString("type", "CANCELLED");
@@ -331,10 +334,10 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                     result.putString("call_from", cancelledCallInvite.getFrom());
                     result.putString("call_to", cancelledCallInvite.getTo());
                     result.putString("call_state", "CANCELLED");
-                    if (callException != null) {
-                        result.putString("error", callException.getMessage());
-                        result.putString("error_explanation", callException.getExplanation());
-                        result.putString("error_code", String.valueOf(callException.getErrorCode()));
+                    if (error != null) {
+                        result.putString("error", error.getMessage());
+                        result.putString("error_explanation", error.getExplanation());
+                        result.putInt("error_code", error.getErrorCode());
                     }
                     activeCallInvite = null;
                     eventManager.sendEvent(EVENT_INCOMING_CALL_CANCELLED, result);
