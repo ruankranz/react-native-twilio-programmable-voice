@@ -2,9 +2,12 @@ package com.hoxfon.react.RNTwilioVoice;
 
 import android.app.Activity;
 import android.content.Intent;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
 import android.util.Log;
+
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReadableMap;
@@ -194,7 +197,9 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
             @Override
             public void onReconnecting(@NonNull Call call, @NonNull CallException callException) {
-                Log.d(TAG, "Reconnecting");
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Reconnecting");
+                }
 
                 WritableMap params = Arguments.createMap();
                 params.putString("call_sid", call.getSid());
@@ -206,8 +211,10 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
             @Override
             public void onReconnected(@NonNull Call call) {
-                Log.d(TAG, "Reconnected");
-                
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Reconnected");
+                }
+
                 WritableMap params = Arguments.createMap();
                 params.putString("call_sid", call.getSid());
                 params.putString("call_state", call.getState().name());
@@ -307,13 +314,14 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                         result.putString("error_explanation", callException.getExplanation());
                         result.putString("error_code", String.valueOf(callException.getErrorCode()));
                     }
+                    activeCallInvite = null;
                     eventManager.sendEvent(EVENT_INCOMING_CALL_CANCELLED, result);
                 }
 
             });
 
             if (!valid) {
-                Log.e(TAG, "The message was not a valid Twilio Voice SDK payload: " + notification.toString());
+                Log.d(TAG, "The message was not a valid Twilio Voice SDK payload: " + notification.toString());
             }
 
             promise.resolve(valid);

@@ -32,9 +32,8 @@ public class EventManager {
             Log.d(TAG, "sendEvent "+eventName+" params "+params);
         }
         if (mContext.hasActiveCatalystInstance()) {
-            mContext
-                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
-                .emit(eventName, params);
+            mContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+                    .emit(eventName, params);
         } else {
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "failed Catalyst instance not active");

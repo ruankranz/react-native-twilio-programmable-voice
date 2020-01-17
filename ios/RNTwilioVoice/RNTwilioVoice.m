@@ -694,9 +694,7 @@ didReceiveIncomingPushWithPayload:(PKPushPayload *)payload
 - (void)performVoiceCallWithUUID:(NSUUID *)uuid
                           client:(NSString *)client
                       completion:(void(^)(BOOL success))completionHandler {
-    __weak typeof(self) weakSelf = self;
     TVOConnectOptions *connectOptions = [TVOConnectOptions optionsWithAccessToken:[self fetchAccessToken] block:^(TVOConnectOptionsBuilder *builder) {
-        __strong typeof(self) strongSelf = weakSelf;
         builder.params = _callParams;
         builder.uuid = uuid;
     }];
