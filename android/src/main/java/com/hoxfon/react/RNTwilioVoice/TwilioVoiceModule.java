@@ -1,11 +1,14 @@
 package com.hoxfon.react.RNTwilioVoice;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
+import android.os.Build;
 import android.util.Log;
 
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
@@ -54,6 +57,12 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     private Call.Listener callListener = callListener();
     private Call activeCall;
     private EventManager eventManager;
+    private AudioManager audioManager;
+    private ProximityManager proximityManager;
+    private int originalAudioMode = AudioManager.MODE_NORMAL;
+    private AudioFocusRequest focusRequest;
+    private HeadsetManager headsetManager;
+    private SoundPoolManager soundPoolManager;
 
     public TwilioVoiceModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -66,11 +75,22 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
         reactContext.addLifecycleEventListener(this);
 
         eventManager = new EventManager(reactContext);
+        audioManager = (AudioManager) reactContext.getSystemService(Context.AUDIO_SERVICE);
+        proximityManager = new ProximityManager(reactContext, eventManager);
+        headsetManager = new HeadsetManager(eventManager);
+        soundPoolManager = SoundPoolManager.getInstance(reactContext);
+
     }
 
     @Override
     public void onHostResume() {
-
+        /*
+         * Enable changing the volume using the up/down keys during a conversation
+         */
+        Activity currentActivity = getCurrentActivity();
+        if (currentActivity != null) {
+            currentActivity.setVolumeControlStream(AudioManager.STREAM_VOICE_CALL);
+        }
     }
 
     @Override
@@ -81,6 +101,8 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     @Override
     public void onHostDestroy() {
         disconnect();
+        unsetAudioFocus();
+        soundPoolManager.release();
     }
 
     @Override
@@ -150,6 +172,10 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                     Log.d(TAG, "CALL CONNECTED callListener().onConnected call state = " + call.getState());
                 }
 
+                setAudioFocus();
+                proximityManager.startProximitySensor();
+                headsetManager.startWiredHeadsetEvent(getReactApplicationContext());
+
                 WritableMap params = Arguments.createMap();
                 params.putString("call_sid", call.getSid());
                 params.putString("call_state", call.getState().name());
@@ -165,6 +191,10 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "call disconnected");
                 }
+
+                unsetAudioFocus();
+                proximityManager.stopProximitySensor();
+                headsetManager.stopWiredHeadsetEvent(getReactApplicationContext());
 
                 WritableMap params = Arguments.createMap();
                 String callSid;
@@ -193,6 +223,9 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "connect failure");
                 }
+
+                unsetAudioFocus();
+                proximityManager.stopProximitySensor();
 
                 Log.e(TAG, String.format("CallListener onDisconnected error: %d, %s",
                         error.getErrorCode(), error.getMessage()));
@@ -315,7 +348,13 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
                 @Override
                 public void onCallInvite(@NonNull final CallInvite callInvite) {
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "Received call invite");
+                    }
+
                     final WritableMap result = Arguments.createMap();
+                    SoundPoolManager.getInstance(getReactApplicationContext()).playRinging();
+
                     result.putString("type", "INVITE");
                     result.putString("call_sid", callInvite.getCallSid());
                     result.putString("call_from", callInvite.getFrom());
@@ -327,8 +366,13 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
                 @Override
                 public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite, @Nullable CallException error) {
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "Received cancelled invite");
+                    }
+
                     final WritableMap result = Arguments.createMap();
-                    Log.d(TAG, "Received cancelled");
+                    SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
+
                     result.putString("type", "CANCELLED");
                     result.putString("call_sid", cancelledCallInvite.getCallSid());
                     result.putString("call_from", cancelledCallInvite.getFrom());
@@ -372,8 +416,9 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     public void accept() {
         if (activeCallInvite != null) {
             if (BuildConfig.DEBUG) {
-                Log.d(TAG, "accept() activeCallInvite.getState() PENDING");
+                Log.d(TAG, "accept() activeCallInvite");
             }
+            SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
             activeCallInvite.accept(getReactApplicationContext(), callListener);
         } else {
             eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, null);
@@ -382,6 +427,11 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void reject() {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "reject() activeCallInvite");
+        }
+
+        SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
         WritableMap params = Arguments.createMap();
         if (activeCallInvite != null) {
             params.putString("call_sid", activeCallInvite.getCallSid());
@@ -395,6 +445,11 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void ignore() {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "ignore() activeCallInvite");
+        }
+
+        SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
         WritableMap params = Arguments.createMap();
         if (activeCallInvite != null) {
             params.putString("call_sid", activeCallInvite.getCallSid());
@@ -461,6 +516,9 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void disconnect() {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "disconnect()");
+        }
         if (activeCall != null) {
             activeCall.disconnect();
             activeCall = null;
@@ -469,6 +527,9 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void setMuted(Boolean muteValue) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "setMuted() " + muteValue);
+        }
         if (activeCall != null) {
             activeCall.mute(muteValue);
         }
@@ -476,6 +537,9 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     @ReactMethod
     public void sendDigits(String digits) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "sendDigits() "+ digits);
+        }
         if (activeCall != null) {
             activeCall.sendDigits(digits);
         }
@@ -496,5 +560,63 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             return;
         }
         promise.resolve(null);
+    }
+
+    @ReactMethod
+    public void setSpeakerPhone(Boolean value) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "setSpeakerPhone() " + value);
+        }
+        audioManager.setSpeakerphoneOn(value);
+    }
+
+    private void setAudioFocus() {
+        if (audioManager == null) {
+            return;
+        }
+        originalAudioMode = audioManager.getMode();
+        // Request audio focus before making any device switch
+        if (Build.VERSION.SDK_INT >= 26) {
+            AudioAttributes playbackAttributes = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build();
+            focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                    .setAudioAttributes(playbackAttributes)
+                    .setAcceptsDelayedFocusGain(true)
+                    .setOnAudioFocusChangeListener(new AudioManager.OnAudioFocusChangeListener() {
+                        @Override
+                        public void onAudioFocusChange(int i) { }
+                    })
+                    .build();
+            audioManager.requestAudioFocus(focusRequest);
+        } else {
+            audioManager.requestAudioFocus(
+                    null,
+                    AudioManager.STREAM_VOICE_CALL,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
+            );
+        }
+        /*
+         * Start by setting MODE_IN_COMMUNICATION as default audio mode. It is
+         * required to be in this mode when playout and/or recording starts for
+         * best possible VoIP performance. Some devices have difficulties with speaker mode
+         * if this is not set.
+         */
+        audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+    }
+
+    private void unsetAudioFocus() {
+        if (audioManager == null) {
+            return;
+        }
+        audioManager.setMode(originalAudioMode);
+        if (Build.VERSION.SDK_INT >= 26) {
+            if (focusRequest != null) {
+                audioManager.abandonAudioFocusRequest(focusRequest);
+            }
+        } else {
+            audioManager.abandonAudioFocus(null);
+        }
     }
 }
