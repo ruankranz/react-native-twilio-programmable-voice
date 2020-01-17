@@ -17,7 +17,7 @@ public class EventManager {
     public static final String EVENT_DEVICE_NOT_READY = "deviceNotReady";
     public static final String EVENT_CONNECTION_DID_CONNECT = "connectionDidConnect";
     public static final String EVENT_CONNECTION_DID_DISCONNECT = "connectionDidDisconnect";
-    public static final String EVENT_DEVICE_DID_RECEIVE_INCOMING = "deviceDidReceiveIncoming";
+    public static final String EVENT_INCOMING_CALL_INVITE = "incomingCallInvite";
     public static final String EVENT_INCOMING_CALL_CANCELLED = "incomingCallCancelled";
     public static final String EVENT_CONNECTION_IS_RINGING = "connectionIsRinging";
     public static final String EVENT_CONNECTION_IS_RECONNECTING = "connectionIsReconnecting";
@@ -32,9 +32,8 @@ public class EventManager {
             Log.d(TAG, "sendEvent "+eventName+" params "+params);
         }
         if (mContext.hasActiveCatalystInstance()) {
-            mContext
-                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
-                .emit(eventName, params);
+            mContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+                    .emit(eventName, params);
         } else {
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "failed Catalyst instance not active");
