@@ -23,6 +23,9 @@ public class EventManager {
     public static final String EVENT_CONNECTION_IS_RECONNECTING = "connectionIsReconnecting";
     public static final String EVENT_CONNECTION_DID_RECONNECT = "connectionDidReconnect";
 
+    static final String EVENT_WIRED_HEADSET = "wiredHeadsetDetected";
+    static final String EVENT_PROXIMITY = "proximityEvent";
+
     public EventManager(ReactApplicationContext context) {
         mContext = context;
     }
