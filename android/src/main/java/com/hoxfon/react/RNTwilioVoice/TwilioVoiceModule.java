@@ -32,17 +32,19 @@ import com.twilio.voice.LogLevel;
 import com.twilio.voice.MessageListener;
 import com.twilio.voice.RegistrationException;
 import com.twilio.voice.RegistrationListener;
+import com.twilio.voice.UnregistrationListener;
 import com.twilio.voice.Voice;
 
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_REGISTERED_FOR_CALL_INVITES;
+import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_UNREGISTERED_FOR_CALL_INVITES;
+import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_REGISTRATION_ERROR;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_DID_CONNECT;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_DID_DISCONNECT;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_INCOMING_CALL_INVITE;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_INCOMING_CALL_CANCELLED;
-import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_DEVICE_NOT_READY;
-import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_DEVICE_READY;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_DID_RECONNECT;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_IS_RECONNECTING;
 import static com.hoxfon.react.RNTwilioVoice.EventManager.EVENT_CONNECTION_IS_RINGING;
@@ -54,6 +56,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     private String accessToken;
     private CallInvite activeCallInvite;
     private RegistrationListener registrationListener = registrationListener();
+    private UnregistrationListener unregistrationListener = unregistrationListener();
     private Call.Listener callListener = callListener();
     private Call activeCall;
     private EventManager eventManager;
@@ -118,7 +121,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
 
     @ReactMethod
-    public void initWithAccessToken(final String accessToken, final String fcmToken, Promise promise) {
+    public void registerForCallInvites(final String accessToken, final String fcmToken, Promise promise) {
         if (accessToken.equals("")) {
             promise.reject(new JSApplicationIllegalArgumentException("Invalid access token"));
             return;
@@ -131,12 +134,30 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
         TwilioVoiceModule.this.accessToken = accessToken;
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "initWithAccessToken ACTION_FCM_TOKEN");
+            Log.d(TAG, "registerForCallInvites ACTION_FCM_TOKEN");
         }
-        registerForCallInvites(fcmToken);
-        WritableMap params = Arguments.createMap();
-        params.putBoolean("initialized", true);
-        promise.resolve(params);
+        Voice.register(accessToken, Voice.RegistrationChannel.FCM, fcmToken, registrationListener);
+        promise.resolve(null);
+    }
+
+    @ReactMethod
+    public void unregisterForCallInvites(final String accessToken, final String fcmToken, Promise promise) {
+        if (accessToken.equals("")) {
+            promise.reject(new JSApplicationIllegalArgumentException("Invalid access token"));
+            return;
+        }
+
+        if (fcmToken.equals("")) {
+            promise.reject(new JSApplicationIllegalArgumentException("Invalid FCM token"));
+            return;
+        }
+
+        TwilioVoiceModule.this.accessToken = accessToken;
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "unregisterForCallInvites ACTION_FCM_TOKEN");
+        }
+        Voice.unregister(accessToken, Voice.RegistrationChannel.FCM, fcmToken, unregistrationListener);
+        promise.resolve(null);
     }
 
     @ReactMethod
@@ -169,34 +190,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 }
             }
 
-            boolean valid = Voice.handleMessage(getReactApplicationContext(), data, new MessageListener() {
-
-                @Override
-                public void onCallInvite(@NonNull final CallInvite callInvite) {
-                    if (BuildConfig.DEBUG) {
-                        Log.d(TAG, "Received call invite: " + callInvite.getCallSid());
-                    }
-
-                    final WritableMap result = getEventParams(callInvite,"INCOMING_CALL_INVITE");
-                    activeCallInvite = callInvite;
-                    eventManager.sendEvent(EVENT_INCOMING_CALL_INVITE, result);
-                    SoundPoolManager.getInstance(getReactApplicationContext()).playRinging();
-                }
-
-                @Override
-                public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite, @Nullable CallException error) {
-                    if (BuildConfig.DEBUG) {
-                        Log.d(TAG, "Received cancelled invite");
-                    }
-
-                    final WritableMap result = getEventParams(cancelledCallInvite, error);
-                    activeCallInvite = null;
-                    eventManager.sendEvent(EVENT_INCOMING_CALL_CANCELLED, result);
-                    SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
-                    cleanupVoiceServices();
-                }
-
-            });
+            boolean valid = initializeTwilioMessageListener(data);
 
             if (!valid) {
                 Log.d(TAG, "The message was not a valid Twilio Voice SDK payload: " + notification.toString());
@@ -262,7 +256,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
         WritableMap errParams = Arguments.createMap();
         if (accessToken == null) {
             errParams.putString("error", "Invalid access token");
-            eventManager.sendEvent(EVENT_DEVICE_NOT_READY, errParams);
+            eventManager.sendEvent(EVENT_REGISTRATION_ERROR, errParams);
             return;
         }
         if (params == null) {
@@ -369,7 +363,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "Successfully registered FCM");
                 }
-                eventManager.sendEvent(EVENT_DEVICE_READY, null);
+                eventManager.sendEvent(EVENT_REGISTERED_FOR_CALL_INVITES, null);
             }
 
             @Override
@@ -377,10 +371,63 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 Log.e(TAG, String.format("Registration Error: %d, %s", error.getErrorCode(), error.getMessage()));
                 WritableMap params = Arguments.createMap();
                 params.putString("error", error.getMessage());
-                eventManager.sendEvent(EVENT_DEVICE_NOT_READY, params);
+                eventManager.sendEvent(EVENT_REGISTRATION_ERROR, params);
             }
         };
     }
+
+    private UnregistrationListener unregistrationListener() {
+        return new UnregistrationListener() {
+            @Override
+            public void onUnregistered(String accessToken, String fcmToken) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Successfully unregistered FCM");
+                }
+                eventManager.sendEvent(EVENT_UNREGISTERED_FOR_CALL_INVITES, null);
+            }
+
+            @Override
+            public void onError(RegistrationException error, String accessToken, String fcmToken) {
+                Log.e(TAG, String.format("Unregistration Error: %d, %s", error.getErrorCode(), error.getMessage()));
+                WritableMap params = Arguments.createMap();
+                params.putString("error", error.getMessage());
+                eventManager.sendEvent(EVENT_REGISTRATION_ERROR, params);
+            }
+        };
+    }
+
+    private boolean initializeTwilioMessageListener(Map<String, String> data) {
+        return Voice.handleMessage(getReactApplicationContext(), data, new MessageListener() {
+
+            @Override
+            public void onCallInvite(@NonNull final CallInvite callInvite) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Received call invite: " + callInvite.getCallSid());
+                }
+
+                SoundPoolManager.getInstance(getReactApplicationContext()).playRinging();
+                final WritableMap result = getEventParams(callInvite,"INCOMING_CALL_INVITE");
+                activeCallInvite = callInvite;
+                eventManager.sendEvent(EVENT_INCOMING_CALL_INVITE, result);
+
+            }
+
+            @Override
+            public void onCancelledCallInvite(@NonNull final CancelledCallInvite cancelledCallInvite, @Nullable CallException error) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Received cancelled invite");
+                }
+
+                SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
+                final WritableMap result = getEventParams(cancelledCallInvite, error);
+                activeCallInvite = null;
+                eventManager.sendEvent(EVENT_INCOMING_CALL_CANCELLED, result);
+                cleanupVoiceServices();
+            }
+
+        });
+    }
+
 
     private Call.Listener callListener() {
         return new Call.Listener() {
@@ -480,16 +527,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         // Ignored, required to implement ActivityEventListener for RN 0.33
     }
-
-
-    private void registerForCallInvites(@NonNull String fcmToken) {
-        if (BuildConfig.DEBUG) {
-            Log.d(TAG, "Registering with FCM");
-        }
-
-        Voice.register(accessToken, Voice.RegistrationChannel.FCM, fcmToken, registrationListener);
-    }
-
 
     private void cleanupVoiceServices() {
         setAudioFocus(false);
