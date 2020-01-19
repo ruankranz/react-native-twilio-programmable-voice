@@ -12,9 +12,10 @@ const TwilioVoice = NativeModules.RNTwilioVoice
 const NativeAppEventEmitter = new NativeEventEmitter(TwilioVoice)
 
 const _eventHandlers = {
-    deviceReady: new Map(),
-    deviceNotReady: new Map(),
-    deviceDidReceiveIncoming: new Map(),
+    registeredForCallInvites: new Map(),
+    unregisteredForCallInvites: new Map(),
+    registrationError: new Map(),
+    incomingCallInvite: new Map(),
     connectionDidConnect: new Map(),
     connectionDidDisconnect: new Map(),
     connectionIsRinging: new Map(),
@@ -31,22 +32,13 @@ const Twilio = {
     // return {initialized: true} when the initialization started
     // Listen to deviceReady and deviceNotReady events to see whether
     // the initialization succeeded
-    async initWithToken(voipToken, pushToken = null) {
+    registerForCallInvites(voipToken, pushToken = null) {
         if (typeof voipToken !== 'string') {
             return {
                 initialized: false,
                 err:         'Invalid token, token must be a string'
             }
         };
-
-        // native react promise present only for Android
-        // iOS initWithAccessToken doesn't return
-        if (Platform.OS === IOS) {
-            await TwilioVoice.initWithAccessToken(voipToken)
-            return {
-                initialized: true,
-            }
-        }
 
         if (typeof pushToken !== 'string') {
             return {
@@ -55,9 +47,24 @@ const Twilio = {
             }
         };
 
-        const result = await TwilioVoice.initWithAccessToken(voipToken, pushToken)
-        
-        return result
+        TwilioVoice.registerForCallInvites(voipToken, pushToken)
+    },
+    unregisterForCallInvites(voipToken, pushToken = null) {
+        if (typeof voipToken !== 'string') {
+            return {
+                initialized: false,
+                err:         'Invalid token, token must be a string'
+            }
+        };
+
+        if (typeof pushToken !== 'string') {
+            return {
+                initialized: false,
+                err:         'Invalid push token must be a string'
+            }
+        };
+
+        TwilioVoice.unregisterForCallInvites(voipToken, pushToken)
     },
     initWithTokenUrl(url) {
         if (Platform.OS === IOS) {
@@ -68,8 +75,8 @@ const Twilio = {
         const result = await TwilioVoice.handleTwilioMessage(params)
         return result
     },
-    connect(params = {}) {
-        TwilioVoice.connect(params)
+    connect(params = {}), accessToken {
+        TwilioVoice.connect(params, accessToken)
     },
     disconnect() {
         TwilioVoice.disconnect()
@@ -107,7 +114,7 @@ const Twilio = {
         }
     },
     getActiveCall() {
-        return TwilioVoice.getActiveCall()
+        return TwilioVoice.getActiveCallData()
     },
     configureCallKit(params = {}) {
         if (Platform.OS === IOS) {
