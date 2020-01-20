@@ -474,7 +474,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 Log.e(TAG, String.format("CallListener onReconnecting error: %d, %s",
                         error.getErrorCode(), error.getMessage()));
 
-                cleanupVoiceServices();
                 WritableMap params = getEventParams(call, error);
                 eventManager.sendEvent(EVENT_CONNECTION_IS_RECONNECTING, params);
             }
@@ -485,10 +484,8 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                     Log.d(TAG, "Reconnected");
                 }
 
-                startVoiceServices();
-
-                WritableMap params = getEventParams(call);
                 activeCall = call;
+                WritableMap params = getEventParams(call);
                 eventManager.sendEvent(EVENT_CONNECTION_DID_RECONNECT, params);
             }
         };

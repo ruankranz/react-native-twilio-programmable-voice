@@ -13,13 +13,13 @@ public class EventManager {
 
     private ReactApplicationContext mContext;
 
-    public static final String EVENT_CONNECTION_DID_CONNECT = "connectionDidConnect";
-    public static final String EVENT_CONNECTION_DID_DISCONNECT = "connectionDidDisconnect";
-    public static final String EVENT_INCOMING_CALL_INVITE = "incomingCallInvite";
-    public static final String EVENT_INCOMING_CALL_CANCELLED = "incomingCallCancelled";
-    public static final String EVENT_CONNECTION_IS_RINGING = "connectionIsRinging";
-    public static final String EVENT_CONNECTION_IS_RECONNECTING = "connectionIsReconnecting";
-    public static final String EVENT_CONNECTION_DID_RECONNECT = "connectionDidReconnect";
+    static final String EVENT_CONNECTION_DID_CONNECT = "connectionDidConnect";
+    static final String EVENT_CONNECTION_DID_DISCONNECT = "connectionDidDisconnect";
+    static final String EVENT_INCOMING_CALL_INVITE = "incomingCallInvite";
+    static final String EVENT_INCOMING_CALL_CANCELLED = "incomingCallCancelled";
+    static final String EVENT_CONNECTION_IS_RINGING = "connectionIsRinging";
+    static final String EVENT_CONNECTION_IS_RECONNECTING = "connectionIsReconnecting";
+    static final String EVENT_CONNECTION_DID_RECONNECT = "connectionDidReconnect";
     static final String EVENT_REGISTERED_FOR_CALL_INVITES = "registeredForCallInvites";
     static final String EVENT_UNREGISTERED_FOR_CALL_INVITES = "unregisteredForCallInvites";
     static final String EVENT_REGISTRATION_ERROR = "registrationError";
